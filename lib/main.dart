@@ -1,91 +1,102 @@
-import 'dart:math';
-import 'package:flutter/material.dart';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
-import 'package:google_ml_kit/google_ml_kit.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'dart:async';
+import 'dart:developer';
 
-void main() => runApp(const MyApp());
+import 'package:flutter/material.dart';
+import 'package:flutter_scalable_ocr/flutter_scalable_ocr.dart';
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: ProductsListPage(),
+    return MaterialApp(
+      title: 'Flutter Scalable OCR',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const MyHomePage(title: 'Flutter Scalable OCR'),
     );
   }
 }
 
-class ProductsListPage extends StatefulWidget {
-  const ProductsListPage({super.key});
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, required this.title});
+
+  final String title;
 
   @override
-  _ProductsListPageState createState() => _ProductsListPageState();
+  State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _ProductsListPageState extends State<ProductsListPage> {
-  // ignore: unused_field
-  late File _image;
-  List<String> products = [];
+class _MyHomePageState extends State<MyHomePage> {
+  String text = "";
+  final StreamController<String> controller = StreamController<String>();
 
-  late final InputImage inputImage;
-  final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+  void setText(value) {
+    controller.add(value);
+  }
 
-  Future<void> _getImageAndRecognizeText(ImageSource source) async {
-    final RecognizedText recognizedText =
-        await textRecognizer.processImage(inputImage);
-
-    String text = recognizedText.text;
-    for (TextBlock block in recognizedText.blocks) {
-      final Rect rect = block.boundingBox;
-      final List<Point<int>> cornerPoints = block.cornerPoints;
-      final String text = block.text;
-      final List<String> languages = block.recognizedLanguages;
-
-      for (TextLine line in block.lines) {
-        // Same getters as TextBlock
-        for (TextElement element in line.elements) {
-          // Same getters as TextBlock
-        }
-      }
-      textRecognizer.close();
-    }
-
-    // final pickedImage = await ImagePicker().pickImage(source: source);
-    // if (pickedImage != null) {
-    //   final image = GoogleMlKit.fromFile(File(pickedImage.path));
-    //   final textRecognizer = GoogleMlKit.vision.textRecognizer();
-    //   final visionText = await textRecognizer.processImage(image as InputImage);
-    //   String? extractedText = visionText.text;
-    //   setState(() {
-    //     products.add(extractedText);
-    //   });
-    //   textRecognizer.close();
-    // }
+  @override
+  void dispose() {
+    controller.close();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Products List')),
-      body: Column(
-        children: [
-          ElevatedButton(
-            onPressed: () => _getImageAndRecognizeText(ImageSource.gallery),
-            child: const Text('Select Image'),
+        appBar: AppBar(
+          title: Text(widget.title),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: <Widget>[
+              ScalableOCR(
+                  paintboxCustom: Paint()
+                    ..style = PaintingStyle.stroke
+                    ..strokeWidth = 4.0
+                    ..color = const Color.fromARGB(153, 102, 160, 241),
+                  boxLeftOff: 5,
+                  boxBottomOff: 2.5,
+                  boxRightOff: 5,
+                  boxTopOff: 2.5,
+                  boxHeight: MediaQuery.of(context).size.height / 3,
+                  getRawData: (value) {
+                    inspect(value);
+                  },
+                  getScannedText: (value) {
+                    setText(value);
+                  }),
+              StreamBuilder<String>(
+                stream: controller.stream,
+                builder: (BuildContext context, AsyncSnapshot<String> snapshot) {
+                  return Result(text: snapshot.data != null ? snapshot.data! : "");
+                },
+              )
+            ],
           ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: products.length,
-              itemBuilder: (context, index) => ListTile(
-                title: Text(products[index]),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+        ));
   }
 }
+
+class Result extends StatelessWidget {
+  const Result({
+    Key? key,
+    required this.text,
+  }) : super(key: key);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text("Readed text: $text");
+  }
+}
+
